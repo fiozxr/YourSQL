@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>YourSQL</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.8.0/sql-asm.js"></script>
+    <style>
+        :root {
+            /* True Dark Mode: Pure black background, aesthetic dark surfaces */
+            --bg: #000000;
+            --surface: #121212;
+            --border: #2a2a2a;
+            --text-main: #ffffff;
+            --text-muted: #888888;
+            --accent: #ffffff;
+            --radius: 8px;
+            --danger: #ff5555;
+            --success: #00ff88;
+        }
+
+        * { box-sizing: border-box; }
+
+        body {
+            background-color: var(--bg);
+            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+
+        /* Navbar Styling */
+        .navbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px 20px;
+            border-bottom: 1px solid var(--border);
+            background-color: var(--surface);
+        }
+
+        .brand {
+            font-size: 1.1rem;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+            color: var(--accent);
+        }
+
+        .nav-controls {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        #storage-badge {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+            margin-right: 5px;
+        }
+
+        .nav-btn {
+            background: transparent;
+            color: var(--text-main);
+            border: 1px solid var(--border);
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .nav-btn:hover { background: var(--text-main); color: var(--bg); }
+
+        /* Main Views */
+        .view-container {
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            flex-grow: 1;
+            overflow: hidden;
+        }
+
+        #explorer-view { display: none; }
+
+        /* Editor Elements */
+        textarea {
+            width: 100%;
+            height: 25vh;
+            min-height: 120px;
+            background: var(--surface);
+            color: var(--text-main);
+            border: 1px solid var(--border);
+            padding: 15px;
+            font-family: 'Consolas', 'Liberation Mono', Menlo, monospace;
+            font-size: 14px;
+            line-height: 1.5;
+            outline: none;
+            border-radius: var(--radius);
+            resize: none;
+            transition: border-color 0.2s;
+        }
+
+        textarea:focus { border-color: #555; }
+
+        /* Controls */
+        .btn-group { display: flex; gap: 10px; }
+
+        .action-btn {
+            flex: 2;
+            padding: 12px;
+            background: var(--surface);
+            color: var(--text-main);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            font-size: 0.9rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .action-btn.secondary { flex: 1; }
+        .action-btn:hover { background: #1a1a1a; border-color: #555; }
+        .action-btn.danger:hover { border-color: var(--danger); color: var(--danger); }
+
+        #output-console {
+            padding: 12px 15px;
+            border-radius: var(--radius);
+            font-size: 0.85rem;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            color: var(--text-muted);
+            word-wrap: break-word;
+        }
+
+        /* Table Area */
+        .results-scroll {
+            flex-grow: 1;
+            overflow: auto;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            background: var(--surface);
+        }
+
+        table { width: 100%; border-collapse: collapse; font-family: 'Consolas', monospace; font-size: 0.85rem; }
+        th { background: #181818; color: var(--text-muted); text-align: left; padding: 12px 15px; font-weight: normal; border-bottom: 1px solid var(--border); position: sticky; top: 0; }
+        td { padding: 12px 15px; border-bottom: 1px solid #1a1a1a; color: #d0d0d0; }
+
+        /* Explorer Tree Styling */
+        .tree-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); padding-bottom: 10px; }
+        .tree-header h2 { margin: 0; font-size: 1.1rem; font-weight: 500; }
+        
+        .tree-scroll { flex-grow: 1; overflow: auto; padding: 10px 0; }
+        ul.tree { list-style-type: none; padding-left: 0; margin: 0; }
+        ul.tree ul { list-style-type: none; padding-left: 20px; border-left: 1px solid #333; margin-left: 10px; margin-top: 5px; }
+        ul.tree li { margin-bottom: 10px; font-family: 'Consolas', monospace; font-size: 0.9rem; }
+        .table-name { color: var(--accent); font-weight: bold; font-size: 1rem; }
+        .col-name { color: #ccc; }
+        .col-type { color: #666; font-size: 0.8em; margin-left: 5px; }
+
+        /* Footer */
+        footer { text-align: center; padding: 12px; font-size: 0.75rem; color: #444; border-top: 1px solid var(--border); letter-spacing: 0.5px; }
+
+        /* Mobile Optimization */
+        @media (max-width: 600px) {
+            .navbar { flex-direction: column; align-items: flex-start; gap: 12px; }
+            .nav-controls { width: 100%; justify-content: flex-end; flex-wrap: wrap; }
+            .view-container { padding: 12px; }
+            .btn-group { flex-wrap: wrap; }
+            .action-btn { flex: 1 1 45%; } /* Force equal wrapping */
+        }
+    </style>
+</head>
+<body>
+
+    <input type="file" id="import-file" accept=".sql" style="display: none;" onchange="handleImport(event)">
+
+    <nav class="navbar">
+        <div class="brand">YourSQL</div>
+        <div class="nav-controls">
+            <span id="storage-badge">Checking memory...</span>
+            <button class="nav-btn" onclick="document.getElementById('import-file').click()">Import .sql</button>
+            <button class="nav-btn" onclick="exportSQLDump()">Export .sql</button>
+        </div>
+    </nav>
+
+    <div class="view-container" id="editor-view">
+        <textarea id="sql-input" spellcheck="false" placeholder="Write your SQL queries here..."></textarea>
+
+        <div class="btn-group">
+            <button class="action-btn" onclick="runQuery()">Run Query</button>
+            <button class="action-btn secondary" onclick="clearConsole()">Clear</button>
+            <button class="action-btn secondary" onclick="toggleView('explorer')">Explorer</button>
+            <button class="action-btn secondary danger" onclick="nukeDatabase()">Wipe</button>
+        </div>
+
+        <div id="output-console">Initializing aesthetic engine...</div>
+
+        <div class="results-scroll" id="results-target"></div>
+    </div>
+
+    <div class="view-container" id="explorer-view">
+        <div class="tree-header">
+            <h2>Database Explorer</h2>
+            <button class="nav-btn" onclick="toggleView('editor')">← Back to Editor</button>
+        </div>
+        <div class="tree-scroll" id="tree-target">
+            </div>
+    </div>
+
+ <footer>
+     Download from : <a href="https://github.com/fiozxr/yoursql">GitHub</a>
+</footer>
+
+<script>
+    let db = null;
+    const DB_KEY = "xr_sql_saved_db";
+
+    // --- Core Database Functions ---
+    function toBase64(arr) {
+        let binary = '';
+        for (let i = 0; i < arr.byteLength; i++) { binary += String.fromCharCode(arr[i]); }
+        return window.btoa(binary);
+    }
+
+    function fromBase64(b64) {
+        const binary = window.atob(b64);
+        const bytes = new Uint8Array(binary.length);
+        for (let i = 0; i < binary.length; i++) { bytes[i] = binary.charCodeAt(i); }
+        return bytes;
+    }
+
+    initSqlJs().then(function(SQL) {
+        const savedData = localStorage.getItem(DB_KEY);
+        if (savedData) {
+            try {
+                db = new SQL.Database(fromBase64(savedData));
+                log("Session restored from local storage.");
+            } catch(e) {
+                db = new SQL.Database();
+                log("Corrupted save. Started fresh.");
+            }
+        } else {
+            db = new SQL.Database();
+            log("System ready. Fresh database initialized.");
+        }
+        updateBadge();
+    });
+
+    function log(msg, color = "var(--text-muted)") {
+        const consoleEl = document.getElementById('output-console');
+        consoleEl.innerText = msg;
+        consoleEl.style.color = color;
+    }
+
+    function updateBadge() {
+        const data = localStorage.getItem(DB_KEY);
+        const badge = document.getElementById('storage-badge');
+        if(data) badge.innerText = `${(data.length / 1024).toFixed(1)} KB Stored`;
+        else badge.innerText = `Storage Empty`;
+    }
+
+    function saveDatabase() {
+        if (!db) return;
+        localStorage.setItem(DB_KEY, toBase64(db.export()));
+        updateBadge();
+    }
+
+    // --- Query Execution ---
+    function runQuery() {
+        if (!db) return log("Engine not ready.", "var(--danger)");
+        const sql = document.getElementById('sql-input').value.trim();
+        const target = document.getElementById('results-target');
+        target.innerHTML = '';
+        
+        if (!sql) return log("Query is empty.", "var(--danger)");
+
+        try {
+            const res = db.exec(sql);
+            saveDatabase();
+
+            if (res.length === 0) {
+                if (sql.toUpperCase().includes("SELECT")) log("Query OK, but table is empty. (0 rows)", "#ffaa00");
+                else log("Execution successful. State saved.");
+            } else {
+                log("Query successful.", "#e0e0e0");
+                renderTable(res[res.length - 1]); 
+            }
+        } catch (e) {
+            log("Error: " + e.message, "var(--danger)");
+        }
+    }
+
+    function renderTable(obj) {
+        let html = '<table><thead><tr>';
+        obj.columns.forEach(col => html += `<th>${col}</th>`);
+        html += '</tr></thead><tbody>';
+        obj.values.forEach(row => {
+            html += '<tr>';
+            row.forEach(val => html += `<td>${val === null ? 'NULL' : val}</td>`);
+            html += '</tr>';
+        });
+        html += '</tbody></table>';
+        document.getElementById('results-target').innerHTML = html;
+    }
+
+    function clearConsole() {
+        document.getElementById('sql-input').value = '';
+        document.getElementById('results-target').innerHTML = '';
+        log("Console cleared.");
+    }
+
+    function nukeDatabase() {
+        if(confirm("Permanently delete the database?")) {
+            localStorage.removeItem(DB_KEY);
+            location.reload(); 
+        }
+    }
+
+    // --- UI View Toggling & Tree Generator ---
+    function toggleView(viewName) {
+        if (viewName === 'explorer') {
+            document.getElementById('editor-view').style.display = 'none';
+            document.getElementById('explorer-view').style.display = 'flex';
+            generateTree();
+        } else {
+            document.getElementById('explorer-view').style.display = 'none';
+            document.getElementById('editor-view').style.display = 'flex';
+        }
+    }
+
+    function generateTree() {
+        const treeTarget = document.getElementById('tree-target');
+        treeTarget.innerHTML = '';
+
+        if (!db) return;
+
+        try {
+            // Get all tables
+            const tablesQuery = db.exec("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';");
+            
+            if (tablesQuery.length === 0) {
+                treeTarget.innerHTML = '<p style="color: var(--text-muted); font-style: italic;">Database is completely empty. Create a table first!</p>';
+                return;
+            }
+
+            let html = '<ul class="tree">';
+            const tables = tablesQuery[0].values;
+
+            tables.forEach(table => {
+                const tableName = table[0];
+                html += `<li><span class="table-name">📁 ${tableName}</span><ul>`;
+                
+                // Get columns for each table via PRAGMA
+                const colQuery = db.exec(`PRAGMA table_info(${tableName});`);
+                if (colQuery.length > 0) {
+                    colQuery[0].values.forEach(col => {
+                        const colName = col[1];
+                        const colType = col[2] || "UNKNOWN";
+                        const isPk = col[5] === 1 ? " 🔑" : "";
+                        html += `<li><span class="col-name">📄 ${colName}</span><span class="col-type">(${colType})${isPk}</span></li>`;
+                    });
+                }
+                html += `</ul></li>`;
+            });
+            html += '</ul>';
+            treeTarget.innerHTML = html;
+
+        } catch (e) {
+            treeTarget.innerHTML = `<p style="color: var(--danger);">Error loading tree: ${e.message}</p>`;
+        }
+    }
+
+    // --- Import / Export ---
+    function exportSQLDump() {
+        if (!db) return;
+        try {
+            let dump = "-- SQL Dump exported from SQL Studio\n";
+            dump += "-- Date: " + new Date().toLocaleString() + "\n\n";
+            
+            const tablesQuery = db.exec("SELECT name, sql FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%';");
+            if (tablesQuery.length === 0) return log("Database is empty. Nothing to export.", "#ffaa00");
+
+            const tables = tablesQuery[0].values;
+            tables.forEach(table => {
+                const tableName = table[0];
+                const tableSchema = table[1];
+                
+                dump += `-- Table structure for: ${tableName}\n`;
+                dump += `${tableSchema};\n\n`;
+                
+                const dataQuery = db.exec(`SELECT * FROM ${tableName}`);
+                if (dataQuery.length > 0) {
+                    const rows = dataQuery[0].values;
+                    const cols = dataQuery[0].columns;
+                    rows.forEach(row => {
+                        const formattedValues = row.map(val => {
+                            if (val === null) return 'NULL';
+                            if (typeof val === 'string') return `'${val.replace(/'/g, "''")}'`;
+                            return val;
+                        });
+                        dump += `INSERT INTO ${tableName} (${cols.join(", ")}) VALUES (${formattedValues.join(", ")});\n`;
+                    });
+                }
+                dump += "\n\n";
+            });
+
+            const blob = new Blob([dump], { type: 'text/sql' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'exported_database.sql';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            log("SQL Dump generated and downloaded!", "var(--success)");
+        } catch (e) {
+            log("Export Error: " + e.message, "var(--danger)");
+        }
+    }
+
+    function handleImport(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function(e) {
+            const sqlText = e.target.result;
+            try {
+                db.run(sqlText); // Execute the raw SQL dump
+                saveDatabase();
+                log(`Successfully imported ${file.name}!`, "var(--success)");
+                document.getElementById('import-file').value = ""; // Reset input
+                
+                // Auto-refresh the tree if it's currently open
+                if (document.getElementById('explorer-view').style.display === 'flex') {
+                    generateTree();
+                }
+            } catch (err) {
+                log("Import Error: " + err.message, "var(--danger)");
+            }
+        };
+        reader.readAsText(file);
+    }
+</script>
+
+</body>
+</html>
