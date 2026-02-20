@@ -6,6 +6,9 @@
 
 **YourSQL** is a lightning-fast, zero-dependency, fully local SQL IDE that runs entirely in your browser. 
 
+# WEB
+https://fiozxr.github.io/YourSQL
+
 No backend. No server installations. No heavy desktop clients. Just a single `.html` file that spins up a persistent SQLite environment instantly, whether you're on a desktop or an Android phone.
 
 ## 🎯 Why YourSQL?
